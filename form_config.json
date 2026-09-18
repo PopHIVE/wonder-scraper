@@ -1,0 +1,255 @@
+{
+  "_schema": [
+    "One entry per CDC WONDER database under dataset_versions. Keys read directly by the govex",
+    "cdc_wonder package's wonder_query(): base_url, year_selector, state_selector, groupby_options.",
+    "Keys read by cdc_wonder_puller.py: dataset_code, year_range, age_groupings, cause_axes.",
+    "",
+    "groupby_options is keyed by a fixed vocabulary of ROLE names -- State, County, Year, Sex, Race,",
+    "Hispanic Origin -- so cdc_wonder_puller.build_queries() can stay database-agnostic. 'Age' is",
+    "deliberately absent: the puller injects it at run time from age_groupings, once per grouping",
+    "(as 'Age[ten_year]', 'Age[five_year]', ...) plus a plain 'Age' alias for the selected default,",
+    "so a single run can mix age resolutions (the drowning pull needs Ten-Year for county_age and",
+    "Five-Year for county_pop5yr -- see ingest.R's FIVE_TO_TEN_YEAR_AGE for why).",
+    "",
+    "Every code here (D158.V5 etc.) is a WONDER-internal variable id found by loading each live",
+    "request form and reading the <label> text next to each radio/select -- CDC documents none of",
+    "them, and they are not guessable from the number (on D158, V51 is Five-Year and V52 is",
+    "Single-Year, so the suffix is not 'years of resolution'). The full raw dump of D158's form is",
+    "in wonder_form_fields.txt. The same Vxx numbering is shared by D76/D77/D157/D158 (the mortality",
+    "databases) but NOT by the natality databases, which number their variables differently.",
+    "",
+    "cause_axes names the ICD-code finder variable(s) the puller may apply a cause-of-death filter",
+    "through. Each finder's widget ids all derive from that one variable: radio RO_ucd<var> or",
+    "RO_mcd<var>, list codes-<var>, buttons finder-action-<var>-Open Fully / -Open, and the",
+    "current-filter textarea <var>-fhi. Natality has no cause finder, so its cause_axes is empty",
+    "and the puller refuses a --codes argument for it."
+  ],
+
+  "dataset_versions": {
+
+    "ucd_icd10_expanded_2018_2024": {
+      "description": "Underlying Cause of Death, 2018-2024, Single Race (ICD-10 expanded)",
+      "base_url": "https://wonder.cdc.gov/ucd-icd10-expanded.html",
+      "dataset_code": "D158",
+      "year_range": [2018, 2024],
+      "year_selector": "codes-D158.V1",
+      "state_selector": "F_D158.V9",
+      "groupby_options": {
+        "State":           "D158.V9-level1",
+        "County":          "D158.V9-level2",
+        "Year":            "D158.V1-level1",
+        "Sex":             "D158.V7",
+        "Race":            "D158.V42",
+        "Hispanic Origin": "D158.V17"
+      },
+      "age_groupings": {
+        "ten_year":    "D158.V5",
+        "five_year":   "D158.V51",
+        "single_year": "D158.V52",
+        "infant":      "D158.V6"
+      },
+      "cause_axes": {
+        "underlying": "D158.V2"
+      },
+      "_notes": [
+        "This is the database the whole drowning pipeline (raw/, ingest.R) is built on.",
+        "Race V42 is Single Race 6 -- the only race variable WONDER publishes rate denominators for",
+        "(V43 = Single Race 15 and V44 = Single/Multi Race 31 give counts only).",
+        "County x Ten-Year Age Groups returns Deaths only, no Population or Crude Rate, for every",
+        "state and year (CDC-side: 'Rates and populations are not available for single-year age",
+        "groups or 10-year age groups at the county level'). Five-Year county age still reports",
+        "population, which is what ingest.R derives county population from.",
+        "Connecticut 2022+: WONDER returns only the 8 legacy CT counties (09001-09015) with",
+        "Population 'Not Available'; it has no rows for the 9 planning regions that replaced them.",
+        "CDC-side, not fixable from the scraper -- see scraper/README.md."
+      ]
+    },
+
+    "ucd_icd10_1999_2020": {
+      "description": "Underlying Cause of Death, 1999-2020 (bridged race)",
+      "base_url": "https://wonder.cdc.gov/ucd-icd10.html",
+      "dataset_code": "D76",
+      "year_range": [1999, 2020],
+      "year_selector": "codes-D76.V1",
+      "state_selector": "F_D76.V9",
+      "groupby_options": {
+        "State":           "D76.V9-level1",
+        "County":          "D76.V9-level2",
+        "Year":            "D76.V1-level1",
+        "Sex":             "D76.V7",
+        "Race":            "D76.V8",
+        "Hispanic Origin": "D76.V17"
+      },
+      "age_groupings": {
+        "ten_year":    "D76.V5",
+        "five_year":   "D76.V51",
+        "single_year": "D76.V52",
+        "infant":      "D76.V6"
+      },
+      "cause_axes": {
+        "underlying": "D76.V2"
+      },
+      "_notes": [
+        "Same Vxx numbering as D158 except race: D76 has only the 4-category bridged Race variable",
+        "V8 (no V42/V43/V44), so its race breakdown is NOT comparable to D158's single-race one.",
+        "Overlaps D158 for 2018-2020; the two databases use different population bases for those",
+        "years, so rates differ slightly.",
+        "Smoke-tested 2026-08-25 (state_age 2019, drowning): works end to end, same footer",
+        "wording as D158. One difference for anyone writing an ingest for it: this older vintage",
+        "still flags crude rates on fewer than 20 deaths as 'Unreliable' in the rate column",
+        "(Deaths stays numeric), a marker that never occurs in the D158 files and that ingest.R's",
+        "SUPPRESSED_MARKER / MISSING_DENOM_MARKERS lists do not include."
+      ]
+    },
+
+    "mcd_icd10_expanded_2018_2024": {
+      "description": "Multiple Cause of Death, 2018-2024, Single Race (ICD-10 expanded)",
+      "base_url": "https://wonder.cdc.gov/mcd-icd10-expanded.html",
+      "dataset_code": "D157",
+      "year_range": [2018, 2024],
+      "year_selector": "codes-D157.V1",
+      "state_selector": "F_D157.V9",
+      "groupby_options": {
+        "State":           "D157.V9-level1",
+        "County":          "D157.V9-level2",
+        "Year":            "D157.V1-level1",
+        "Sex":             "D157.V7",
+        "Race":            "D157.V42",
+        "Hispanic Origin": "D157.V17"
+      },
+      "age_groupings": {
+        "ten_year":    "D157.V5",
+        "five_year":   "D157.V51",
+        "single_year": "D157.V52",
+        "infant":      "D157.V6"
+      },
+      "cause_axes": {
+        "underlying": "D157.V2",
+        "multiple":   "D157.V13"
+      },
+      "_notes": [
+        "Superset of D158's form with a second cause axis. 'underlying' (D157.V2, radio",
+        "RO_ucdD157.V2) filters on the underlying cause exactly like D158; 'multiple' (D157.V13,",
+        "radio RO_mcdD157.V13, 'MCD - ICD-10 Codes') counts a death if the code appears ANYWHERE on",
+        "the certificate, underlying or contributing. One axis per pull; pass --cause-axis multiple",
+        "for the latter. Both finders exist in the DOM at once and only the radio-selected one is",
+        "submitted, which is why the puller clicks the radio before touching the finder.",
+        "The MCD finder runs in WONDER's 'advanced' mode (hidden O_V13_fmode=fadv): it has two",
+        "'Selected Items' boxes (TD157.V13-AND1 / -AND2, for 'code A AND code B' queries) and NO",
+        "D157.V13-fhi mirror textarea, unlike the UCD finder. The puller therefore verifies the",
+        "applied filter from the highlighted options of codes-D157.V13 itself, which is what the",
+        "form submits (F_D157.V13); the first smoke test failed looking for the -fhi element."
+      ]
+    },
+
+    "mcd_icd10_1999_2020": {
+      "description": "Multiple Cause of Death, 1999-2020 (bridged race)",
+      "base_url": "https://wonder.cdc.gov/mcd-icd10.html",
+      "dataset_code": "D77",
+      "year_range": [1999, 2020],
+      "year_selector": "codes-D77.V1",
+      "state_selector": "F_D77.V9",
+      "groupby_options": {
+        "State":           "D77.V9-level1",
+        "County":          "D77.V9-level2",
+        "Year":            "D77.V1-level1",
+        "Sex":             "D77.V7",
+        "Race":            "D77.V8",
+        "Hispanic Origin": "D77.V17"
+      },
+      "age_groupings": {
+        "ten_year":    "D77.V5",
+        "five_year":   "D77.V51",
+        "single_year": "D77.V52",
+        "infant":      "D77.V6"
+      },
+      "cause_axes": {
+        "underlying": "D77.V2",
+        "multiple":   "D77.V13"
+      },
+      "_notes": [
+        "D76's bridged-race layout plus D157's second cause axis; see both entries' notes.",
+        "Codes verified against the live form on 2026-08-25; not yet exercised from this repo."
+      ]
+    },
+
+    "natality_expanded_2016_2024": {
+      "description": "Natality, 2016-2024 expanded (Single Race)",
+      "base_url": "https://wonder.cdc.gov/natality-expanded-current.html",
+      "dataset_code": "D149",
+      "year_range": [2016, 2024],
+      "year_selector": "SD149.V20",
+      "state_selector": "F_D149.V21",
+      "groupby_options": {
+        "State":           "D149.V21-level1",
+        "County":          "D149.V21-level2",
+        "Year":            "D149.V20",
+        "Sex":             "D149.V3",
+        "Race":            "D149.V42",
+        "Hispanic Origin": "D149.V43"
+      },
+      "age_groupings": {
+        "mother_9":  "D149.V1",
+        "mother_10": "D149.V38",
+        "mother_13": "D149.V39"
+      },
+      "cause_axes": {},
+      "footer": {
+        "year_key": "Year",
+        "geo_labels": {"state": "State of Residence", "county": "County of Residence"}
+      },
+      "_notes": [
+        "Births, not deaths: no cause-of-death finder, so --codes must be omitted (the puller",
+        "raises if given one). The export carries a single Births column -- Birth Rate /",
+        "Fertility Rate are separate checkboxes on this form that the govex package does not",
+        "tick -- so there is no population/rate to derive from these files.",
+        "Role meanings shift here: 'Age' is the MOTHER's age (V1 = 9 groups, V38 = 10, V39 = 13),",
+        "'Race' and 'Hispanic Origin' are the mother's (Single Race 6 / Hispanic Origin), 'Sex' is",
+        "the INFANT's sex (D149.V3). The variable numbering is unrelated to the mortality databases.",
+        "Year is a plain <select> (SD149.V20) rather than a finder, so year_selector has no",
+        "'codes-' prefix.",
+        "Smoke-tested 2026-08-25 (state_gender 2023 and county_gender Delaware 2023): the year",
+        "select is 'multiple' so the govex deselect_all() call is fine, the Year group-by value is",
+        "'D149.V20', the export section has all three CO_show_* boxes, and the footer words things",
+        "differently from the mortality databases ('Year: 2023', 'Group By: State of Residence;",
+        "Sex of Infant'; the state filter line is 'States: Delaware (10)' as on mortality) -- hence",
+        "the footer block above, which the puller's export validation reads."
+      ]
+    },
+
+    "natality_2007_2024": {
+      "description": "Natality, 2007-2024",
+      "base_url": "https://wonder.cdc.gov/natality-current.html",
+      "dataset_code": "D66",
+      "year_range": [2007, 2024],
+      "year_selector": "SD66.V20",
+      "state_selector": "F_D66.V21",
+      "groupby_options": {
+        "State":           "D66.V21-level1",
+        "County":          "D66.V21-level2",
+        "Year":            "D66.V20",
+        "Sex":             "D66.V3",
+        "Race":            "D66.V42",
+        "Hispanic Origin": "D66.V43"
+      },
+      "age_groupings": {
+        "mother_9":  "D66.V1",
+        "mother_10": "D66.V38",
+        "mother_13": "D66.V39"
+      },
+      "cause_axes": {},
+      "footer": {
+        "year_key": "Year",
+        "geo_labels": {"state": "State of Residence", "county": "County of Residence"}
+      },
+      "_notes": [
+        "Same layout and caveats as natality_expanded_2016_2024, with a longer year range and",
+        "fewer medical variables. Race defaults to Mother's Single Race 6 (D66.V42); the bridged",
+        "Mother's Race (D66.V2) is also offered and can be swapped in with groupby_overrides.",
+        "Codes and the footer block are carried over from the expanded entry (same form family);",
+        "this entry itself has not been run from here yet -- smoke-test before any full pull."
+      ]
+    }
+
+  }
+}
